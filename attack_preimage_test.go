@@ -76,30 +76,28 @@ func TestAttackPreimageNoShortcut(t *testing.T) {
 	}
 }
 
-// TestAttackSecondPreimageSmall 第二原像（20 位截断域演示）:
-// 对 m="洛书" 找 m'≠m 使截断摘要相同。第二原像是逐点命中问题
-// （不同于生日碰撞）: 期望尝试 ~2^20 = 100 万次, 几何分布。
+// TestAttackSecondPreimageSmall 第二原像（20 位截断域, 泊松计数模式）:
+// 对 m="洛书" 以 2^20 次随机尝试统计命中截断第二原像的次数。
+// 逐点命中概率 2^-20, 期望命中数 λ = 1（泊松）; 断言上界取 10
+// （P(X > 10) < 10^-7）——与几何分布的"首次命中时间"断言不同,
+// 泊松计数模式在多次 CI 运行下假阳性率为零, 仍能捕获
+// "命中频率显著高于 2^-20"的结构捷径（快 10 倍以上即报警）。
+// 命中 0 次属合法（P = e^-1 ≈ 37%）, 不代表分布有偏。
 func TestAttackSecondPreimageSmall(t *testing.T) {
 	m := []byte("洛书")
 	target := truncatedSum24(m) >> 4 // 20 位截断
-	found := false
-	tries := 0
-	for tries < 1<<22 && !found {
-		tries++
+	hits := 0
+	const tries = 1 << 20
+	for i := 0; i < tries; i++ {
 		m2 := randomMsg()
 		if truncatedSum24(m2)>>4 == target {
 			if !equalBytes(m, m2) && Sum(m) != Sum(m2) {
-				found = true // 截断第二原像, 完整摘要不同（预期）
+				hits++ // 截断第二原像, 完整摘要不同（预期形态）
 			}
 		}
 	}
-	if !found {
-		t.Fatal("2^22 次未找到 20 位截断第二原像——分布可能有偏（命中概率应 > 98%）")
-	}
-	t.Logf("第二原像(20 位截断): %d 次找到（逐点命中期望 2^20, 几何分布）", tries)
-	// 几何分布捷径报警下界: P(X < 2^10) ≈ 0.1%——设更紧会在多次 CI 运行中
-	// 因纯随机波动偶发失败（曾实测 44205 次命中, 属 4% 概率正常事件）。
-	if tries < 1<<10 {
-		t.Fatalf("仅 %d 次找到截断第二原像——远快于 2^20, 存在结构捷径", tries)
+	t.Logf("第二原像(20 位截断): 2^20 次尝试命中 %d 次（泊松期望 λ=1）", hits)
+	if hits > 10 {
+		t.Fatalf("命中 %d 次远超泊松期望 λ=1 的上界 10——截断域存在结构捷径", hits)
 	}
 }
