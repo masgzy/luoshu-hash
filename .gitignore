@@ -1,13 +1,13 @@
-# 二进制与构建产物
-dist/
+# 二进制与构建产物（根路径锚定, 勿用裸名——会误伤 cmd/luoshu 目录）
+/dist/
 *.exe
-luoshu
-cmd/luoshu/luoshu
+/luoshu
+/cmd/luoshu/luoshu
 
 # 测试与覆盖率
 *.out
-coverage.out
-test-output.log
+/coverage.out
+/test-output.log
 *.test
 
 # 编辑器
