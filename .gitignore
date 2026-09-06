@@ -1,0 +1,17 @@
+# 二进制与构建产物
+dist/
+*.exe
+luoshu
+cmd/luoshu/luoshu
+
+# 测试与覆盖率
+*.out
+coverage.out
+test-output.log
+*.test
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+.DS_Store

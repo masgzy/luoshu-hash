@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test & Vet (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go: ['1.21', '1.22', '1.23']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+
+      - name: Check formatting
+        if: matrix.os == 'ubuntu-latest' && matrix.go == '1.23'
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Unit tests + attack suite (KAT / avalanche / differential / collision / extension)
+        run: go test ./... -count=1 2>&1 | tee test-output.log
+
+      - name: Race detector
+        if: matrix.os == 'ubuntu-latest' && matrix.go == '1.23'
+        run: go test -race -count=1 .
+
+      - name: Upload test log
+        if: always() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log-${{ matrix.go }}
+          path: test-output.log
+          retention-days: 7
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Coverage (unit + attack suite)
+        run: |
+          go test -cover -count=1 -coverprofile=coverage.out .
+          go tool cover -func=coverage.out | tail -1
+
+      - name: Coverage threshold check (>= 90%)
+        run: |
+          COV=$(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}' | tr -d '%')
+          echo "coverage = ${COV}%"
+          if [ "${COV%.*}" -lt 90 ]; then
+            echo "::error::coverage ${COV}% is below the 90% threshold"
+            exit 1
+          fi
+
+  bench:
+    name: Benchmark smoke (no assertion)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Quick benchmark
+        run: go test -bench . -benchtime=100x -run '^$' .
+
+  build-cli:
+    name: Build CLI (${{ matrix.goos }}/${{ matrix.goarch }})
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build -trimpath -ldflags="-s -w" -o dist/luoshu-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/luoshu
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: luoshu-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          retention-days: 14
+
+  release:
+    name: Release (tags only)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, coverage, build-cli]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all CLI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          pattern: luoshu-cli-*
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist && sha256sum * > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            dist/*
