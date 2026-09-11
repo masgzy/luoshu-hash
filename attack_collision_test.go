@@ -32,7 +32,10 @@ func truncatedSum24(data []byte) uint32 {
 }
 
 // TestAttackBirthdayTruncated 24 位截断生日搜索。
-// 找到第一对碰撞的期望次数 ≈ √(π/2 × 2^24) ≈ 3600。
+// 找到第一对碰撞的期望次数 ≈ √(π/2 × 2^24) ≈ 5133。
+// 报警下界 96：随机下 P(tries<96) ≈ 2.7e-6/实验（生日碰撞概率
+// 1-e^{-n²/(2·2^24)}），27 次实验/次 CI 的联合假阳性 < 1e-4；
+// 真实结构性捷径（如 2^-12 位偏置）会在几十次内碰撞, 仍被捕获。
 func TestAttackBirthdayTruncated(t *testing.T) {
 	for exp := 0; exp < 3; exp++ {
 		seen := make(map[uint32][]byte, 8192)
@@ -54,7 +57,7 @@ func TestAttackBirthdayTruncated(t *testing.T) {
 			t.Fatalf("实验 %d: 2^21 次搜索未找到 24 位截断碰撞——分布可能有偏", exp)
 		}
 		t.Logf("实验 %d: %d 次找到 24 位截断碰撞（生日期望 √(π/2)·2^12 ≈ 5133）", exp, tries)
-		if tries < 512 {
+		if tries < 96 {
 			t.Fatalf("实验 %d: %d 次即碰撞, 远快于生日界——存在结构性捷径", exp, tries)
 		}
 	}
@@ -134,7 +137,8 @@ func TestAttackJouxMulticollision(t *testing.T) {
 		if !found {
 			t.Fatalf("步 %d: 2^17 次未找到 24 位状态截断块对", step)
 		}
-		if tries < 256 {
+		if tries < 48 {
+			// 报警下界 48: P(tries<48) ≈ 7e-8/次, 36 步/CI 联合假阳性 < 3e-6
 			t.Fatalf("步 %d: %d 次即得块对——压缩函数存在差分捷径", step, tries)
 		}
 		t.Logf("步 %d: %d 次找到 24 位截断状态块对（生日期望 √(π/2)·2^12 ≈ 5133）", step, tries)
