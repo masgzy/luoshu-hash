@@ -17,27 +17,27 @@ var katVectors = []struct {
 }{
 	{
 		"",
-		"0255edb6e3d89e6d32c912ba5e2070968636acd2f0916d211ea466ddfe06c5fa34b17353098c212944709279d551daace33ad44d4235dddc23a4c4dba90048e0",
-		"上炼坏侠症角谋制瞎壳见向冲圈坐候怪什裤晓坡可话慢妙恰帖论次泪凉害驱拼琴赖旗任之扩贡类员植",
-		"05d6aa9",
+		"0255edb6e3d89e6d32c912ba5e2070968636acd2f0916d211ea466ddfe06c5fa3ddde6b79e3dd55ed7670d258d2e73ca7be9dcb683497b9be2596936e1dbcdd6",
+		"上炼坏侠症角谋制瞎壳见向冲圈坐候怪什裤晓坡可话维奉超栏守份估圆抄忙察澡悦锅短理半耐美纯惊",
+		"b553993",
 	},
 	{
 		"abc",
-		"a83c00cae86b499b94fb492549ad82c33cf811466de5e9cb44220b842cffa43c619fb11b4dce0d454ed2e455af93b3fd24bb7b58a2a3959dbd9655dd8aa406ec",
-		"瞬践统熬宋池预弟流婚继胡泥里十挖瓦景天解配草君忆寒奖闺摩庸繁议杨迅杯魏岁浅郁巧耳辛悬拒乳",
-		"afbae66",
+		"a83c00cae86b499b94fb492549ad82c33cf811466de5e9cb44220b842cffa43c194c1f0bc3a65f4d9bf099d68a9a816971982410a117a2abd1161d8978146a75",
+		"瞬践统熬宋池预弟流婚继胡泥里十挖瓦景天解配草君刀京轰叠双廉娃帖参巧鄙纯耍季己旧淫吵穷馆部",
+		"1f7ba80",
 	},
 	{
 		"洛书",
-		"d9bdc81aabad6a42798510213989673042238836c32a82cce47f48e1c2485f8d11f7d630f0cd5f1033e6f2d3cf4dbd4fec8e7785030783e1e377724a82d59eb2",
-		"扭箭小查咋带埋宽带乔企码书醉璃志冰右计摆见强割泪悦碎队鼓壳代仔喝姻忍预妖跪塑着惧寿较凤综",
-		"003ff65",
+		"d9bdc81aabad6a42798510213989673042238836c32a82cce47f48e1c2485f8dd534dcd68c65909e947eaf1daaaf4f6c86395161bf4be2faf84a0e538ef1015d",
+		"扭箭小查咋带埋宽带乔企码书醉璃志冰右计摆见强割浮存殖丁谋面按缝赌爽媒燃答综谱耶弱撩凉纳秘",
+		"cf7c77b",
 	},
 	{
 		"The quick brown fox jumps over the lazy dog",
-		"94b51dc9e357c857ad56628f13712befabdef149cffed1f20957f166923a87f75729af5576f71d4b4b343bf0676b67236fead6480ff60fae8a6da8b18d5ade3e",
-		"束哲漫羞尊哈赏乔丰征啊锤遭检读汁郑蒙份踢弟朋计玄它培免迁胃呆亏射减姐丹躲脏保似映硕负苏硬",
-		"e75d58c",
+		"94b51dc9e357c857ad56628f13712befabdef149cffed1f20957f166923a87f7760c258eb4a9652250a7c48aa5028aa01adc4cc69058676b26ee846254f5078c",
+		"束哲漫羞尊哈赏乔丰征啊锤遭检读汁郑蒙份踢弟朋计催高色恨追待推墙额宇度沟超皆付步题借句瓶劝",
+		"b7f8c11",
 	},
 }
 
@@ -223,6 +223,62 @@ func TestPermutationClosure(t *testing.T) {
 	}
 	if count != 9 {
 		t.Fatalf("72 主轮置换次数 = %d, 应为 9", count)
+	}
+}
+
+// TestProjectionCoverage 投影覆盖断言：九宫全部 1152 位都必须进入摘要。
+// 背景（证伪史）：v1.0.0 早期投影直接项只取宫 0-7，宫 8 的 128 位从未
+// 进入输出（宽管道比实际退化到 2.0），由独立规范审读发现。本测试以
+// finalRounds=0 的白盒钩子绕过收尾轮、直接测纯投影函数，逐宫翻转位
+// 验证输出敏感——任何"某宫被投影忽略"的回归都会被捕获。
+func TestProjectionCoverage(t *testing.T) {
+	// 结构断言：直接项索引 = 除中宫外的八宫（含宫 8）
+	want := map[int]bool{0: true, 1: true, 2: true, 3: true, 5: true, 6: true, 7: true, 8: true}
+	got := map[int]bool{}
+	for _, p := range projSrc {
+		if p == 4 {
+			t.Fatal("projSrc 不得包含中宫 4（中宫经旋转项折入）")
+		}
+		got[p] = true
+	}
+	if len(got) != 8 || len(want) != len(got) {
+		t.Fatalf("projSrc 覆盖 %v, 应为八宫非中宫索引", got)
+	}
+	for k := range want {
+		if !got[k] {
+			t.Fatalf("projSrc 缺少宫 %d", k)
+		}
+	}
+	// 行为断言：finalRounds=0 时收尾轮跳过, out 即纯投影。
+	// 逐宫（含中宫）、双爻、多点位翻转 → 输出必须全部变化。
+	base := [9]palace{}
+	for i := range base {
+		base[i].lo = uint64(i)*0x0101010101010101 + 0x9E3779B97F4A7C15
+		base[i].hi = uint64(i)*0x1010101010101010 ^ 0xBF58476D1CE4E5B9
+	}
+	baseOut := finalMixR(&base, 0, 0, 0)
+	for p := 0; p < 9; p++ {
+		for _, w := range [2]int{0, 1} { // 0=低爻 1=高爻
+			for _, bit := range [3]uint{0, 31, 63} {
+				s := base
+				if w == 0 {
+					s[p].lo ^= 1 << bit
+				} else {
+					s[p].hi ^= 1 << bit
+				}
+				out := finalMixR(&s, 0, 0, 0)
+				same := true
+				for i := range out {
+					if out[i] != baseOut[i] {
+						same = false
+						break
+					}
+				}
+				if same {
+					t.Fatalf("宫%d爻%d位%d不影响投影输出——该宫被投影忽略（P0-1 回归）", p, w, bit)
+				}
+			}
+		}
 	}
 }
 

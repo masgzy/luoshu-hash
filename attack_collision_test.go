@@ -53,7 +53,7 @@ func TestAttackBirthdayTruncated(t *testing.T) {
 		if !found {
 			t.Fatalf("实验 %d: 2^21 次搜索未找到 24 位截断碰撞——分布可能有偏", exp)
 		}
-		t.Logf("实验 %d: %d 次找到 24 位截断碰撞（生日期望 ~3600）", exp, tries)
+		t.Logf("实验 %d: %d 次找到 24 位截断碰撞（生日期望 √(π/2)·2^12 ≈ 5133）", exp, tries)
 		if tries < 512 {
 			t.Fatalf("实验 %d: %d 次即碰撞, 远快于生日界——存在结构性捷径", exp, tries)
 		}
@@ -137,7 +137,7 @@ func TestAttackJouxMulticollision(t *testing.T) {
 		if tries < 256 {
 			t.Fatalf("步 %d: %d 次即得块对——压缩函数存在差分捷径", step, tries)
 		}
-		t.Logf("步 %d: %d 次找到 24 位截断状态块对（生日期望 ~3600）", step, tries)
+		t.Logf("步 %d: %d 次找到 24 位截断状态块对（生日期望 √(π/2)·2^12 ≈ 5133）", step, tries)
 		pairs[step] = pair{A, B}
 		// 链接值推进: 取 A 路径的完整状态（每步链接值分叉后的公共截断）
 		st := h

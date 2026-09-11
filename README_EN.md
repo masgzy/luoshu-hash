@@ -27,15 +27,15 @@ LuoShu-512 is a 512-bit hash function whose native output form is Chinese text. 
 
 ```text
 Input: "洛书"
-Digest: 扭箭小查咋带埋宽带乔企码书醉璃志冰右计摆见强割泪悦碎队鼓壳代仔喝姻忍预妖跪塑着惧寿较凤综
-Check:  003ff65
+Digest: 扭箭小查咋带埋宽带乔企码书醉璃志冰右计摆见强割浮存殖丁谋面按缝赌爽媒燃答综谱耶弱撩凉纳秘
+Check:  cf7c77b
 ```
 
 The construction is a wide-pipe Merkle–Damgård hash whose compression function is built on the Lo Shu magic square (a 3×3 grid of 128-bit palaces, 1152-bit total state) with BLAKE2-style ARX rounds. The full design rationale is documented in the LuoShu-512 specification PDF attached to each [release](https://github.com/masgzy/luoshu-hash/releases).
 
 ## Features
 
-- **512-bit digest, three representations**: 128-char hex / 44 Chinese characters (low 484 bits of D, 11 bits per character, bijective) / 28-bit check code
+- **512-bit digest, three representations**: 128-char hex / 44 Chinese characters (first 484 bits of D, MSB-first, 11 bits per character, bijective) / 28-bit check code
 - **Frozen 2048-character table**: top-2048 characters by frequency from a 600-million-token corpus; the table is the specification, carries a SHA-256 fingerprint, and is verifiable by any independent implementation
 - **Losslessly decodable**: the 44 characters restore the 484 bits; combined with the check code, transcription errors (single-character substitution or transposition) are detected 100% — machine-asserted
 - **Length-extension immunity**: triple defense (HAIFA block counter + finalization flag + 1152→512 projection), demonstrated by a controlled experiment where the bare-MD variant is broken while the real construction resists
@@ -81,7 +81,7 @@ func main() {
     fmt.Printf("%x\n", h.Sum(nil))
 
     // Verify a hand-copied digest
-    err := luoshu.VerifyChinese("44个汉字…", "003ff65")
+    err := luoshu.VerifyChinese("44个汉字…", "cf7c77b")
     fmt.Println(err) // nil = OK
 }
 ```
@@ -90,13 +90,13 @@ func main() {
 
 ```text
 $ luoshu -s "洛书"
-d9bdc81a…59eb2        # hex digest (128 chars)
-扭箭小查…较凤综          # Chinese digest (44 chars)
-003ff65                # check code
+d9bdc81a…f1015d        # hex digest (128 chars)
+扭箭小查…凉纳秘          # Chinese digest (44 chars)
+cf7c77b                # check code
 
 $ luoshu file.txt        # hash a file
 $ cat bigfile | luoshu   # stdin
-$ luoshu -x "44汉字" 003ff65  # verify mode
+$ luoshu -x "44汉字" cf7c77b  # verify mode
 $ luoshu -z -s "洛书"   # Chinese output only
 ```
 
@@ -104,10 +104,10 @@ $ luoshu -z -s "洛书"   # Chinese output only
 
 | Input | Digest (first 12 chars) | Check |
 |---|---|---|
-| `""` | 上炼坏侠症角谋制瞎壳见… | `05d6aa9` |
-| `"abc"` | 瞬践统熬宋池预弟流婚继… | `afbae66` |
-| `"洛书"` | 扭箭小查咋带埋宽带乔企… | `003ff65` |
-| `"The quick brown fox jumps over the lazy dog"` | 束哲漫羞尊哈赏乔丰征啊锤… | `e75d58c` |
+| `""` | 上炼坏侠症角谋制瞎壳见… | `b553993` |
+| `"abc"` | 瞬践统熬宋池预弟流婚继… | `1f7ba80` |
+| `"洛书"` | 扭箭小查咋带埋宽带乔企… | `cf7c77b` |
+| `"The quick brown fox jumps over the lazy dog"` | 束哲漫羞尊哈赏乔丰征啊锤… | `b7f8c11` |
 
 Full vectors are in the specification PDF and `luoshu_test.go`.
 

@@ -34,6 +34,8 @@ const lastMark uint64 = 1 << 63
 
 // sig0/sig1 消息扩展函数，沿用 SHA-512 的已验证常数
 // （降低自研风险面；规范中如实注明出处）。
+// 注意：bits.RotateLeft64(x, -r) 的负旋转等价于 ROTR(x, r)，
+// 与 FIPS 180-4 的 σ0/σ1 完全一致（ROTR1/ROTR8/ROTR19/ROTR61）。
 func sig0(x uint64) uint64 {
 	return bits.RotateLeft64(x, -1) ^ bits.RotateLeft64(x, -8) ^ (x >> 7)
 }
@@ -170,10 +172,16 @@ func finalMixR(s *[9]palace, lenLo, lenHi uint64, finalRounds int) (out [8]uint6
 			G(s, ln[0], ln[1], ln[2], m0, m1, roundK[3*r+j])
 		}
 	}
+	// 终局投影"九宫折八卦"：直接项取除中宫外的八宫（含宫 8），
+	// 中宫双爻经旋转折入 8 个输出字——九宫 1152 位全部参与投影，
+	// 宽管道比 2.25 名副其实（v1.0.0 早期投影直接项只取宫 0-7，
+	// 宫 8 的 128 位从未进入摘要，实际管道比退化到 2.0；由独立
+	// 规范审读发现后修正，投影公式与 KAT 随本次修复冻结）。
 	for i := 0; i < 8; i++ {
+		p := projSrc[i]
 		midLo := bits.RotateLeft64(s[4].lo, -int(projRot[i]))
 		midHi := bits.RotateLeft64(s[4].hi, -int(projRot[(i+4)%8]))
-		out[i] = s[i].lo ^ s[i].hi ^ midLo ^ midHi
+		out[i] = s[p].lo ^ s[p].hi ^ midLo ^ midHi
 	}
 	return
 }
